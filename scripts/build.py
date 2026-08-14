@@ -2,9 +2,9 @@
 """Validate, then merge data/ into one deployable file.
 
 Writes:
-  <outdir>/api/v1/data.json  - all sites, each with a "language" field
-  <outdir>/api/favicons/     - copy of the favicon tree
-  <outdir>/_headers          - Cloudflare Pages headers
+  <outdir>/v1/data.json  - all sites, each with a "language" field
+  <outdir>/favicons/     - copy of the favicon tree
+  <outdir>/_headers      - Cloudflare Pages headers
 """
 
 import datetime
@@ -16,11 +16,11 @@ import sys
 import validate
 
 HEADERS = """\
-/api/v1/data.json
+/v1/data.json
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600
 
-/api/favicons/*
+/favicons/*
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=86400
 """
@@ -51,13 +51,13 @@ def main():
         "sites": sites,
     }
 
-    api_dir = os.path.join(outdir, "api", "v1")
-    os.makedirs(api_dir, exist_ok=True)
-    out_path = os.path.join(api_dir, "data.json")
+    v1_dir = os.path.join(outdir, "v1")
+    os.makedirs(v1_dir, exist_ok=True)
+    out_path = os.path.join(v1_dir, "data.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
 
-    favicon_out = os.path.join(outdir, "api", "favicons")
+    favicon_out = os.path.join(outdir, "favicons")
     if os.path.isdir(favicon_out):
         shutil.rmtree(favicon_out)
     shutil.copytree(validate.FAVICON_DIR, favicon_out, ignore=shutil.ignore_patterns(".*"))

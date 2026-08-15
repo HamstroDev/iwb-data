@@ -32,8 +32,13 @@ jobs:
           git init --initial-branch=dist
           git config user.name "indie-wiki-buddy[bot]"
           git config user.email "317142361+indie-wiki-buddy[bot]@users.noreply.github.com"
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # Build on top of the existing dist history if the branch exists.
+          if git fetch "$remote" dist; then
+            git reset --soft FETCH_HEAD
+          fi
           git add -A
           git commit -m "Build from ${GITHUB_SHA::7}"
-          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" dist
+          git push "$remote" HEAD:dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

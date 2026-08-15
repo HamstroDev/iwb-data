@@ -28,11 +28,20 @@ jobs:
           mv pr/favicons favicons
       - name: Validate data
         run: VALIDATION_REPORT="$RUNNER_TEMP/validation.json" python3 scripts/validate.py
+      # Post as the indie-wiki-buddy app; fall back to github-actions if that fails.
+      - name: Mint app token
+        id: app-token
+        if: always() && github.event_name == 'pull_request_target'
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       # Sticky comment on the PR to share validation details
       - name: Comment results on PR
         if: always() && github.event_name == 'pull_request_target'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}

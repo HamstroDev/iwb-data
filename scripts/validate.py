@@ -30,14 +30,27 @@ warnings = []
 class Loc:
     """Where a problem is: the printed prefix plus the annotation target."""
 
-    def __init__(self, label, path=None, line=1, title="validation"):
+    def __init__(self, label, path=None, line=1, title="validation", fields=None):
         self.label = label
         self.path = path
         self.line = line
         self.title = title
+        self.fields = fields or {}  # field name -> [line, ...] within this entry
 
-    def at(self, suffix, line=None, title=None):
-        return Loc(self.label + suffix, self.path, line or self.line, title or self.title)
+    def at(self, suffix, line=None, title=None, fields=None):
+        return Loc(
+            self.label + suffix,
+            self.path,
+            line or self.line,
+            title or self.title,
+            fields or self.fields,
+        )
+
+    def field(self, name):
+        lines = self.fields.get(name)
+        if not lines:
+            return self
+        return self.at("", line=next((l for l in lines if l >= self.line), lines[-1]))
 
     def __str__(self):
         return self.label
@@ -158,18 +171,19 @@ def check_fields(obj, schema, where):
             if required:
                 err(where, f"missing required field '{name}'")
             continue
+        fwhere = where.field(name)
         value = obj[name]
         if not isinstance(value, ftype):
-            err(where, f"field '{name}' must be {ftype.__name__}")
+            err(fwhere, f"field '{name}' must be {ftype.__name__}")
             continue
         if ftype is str and is_blank(value):
-            err(where, f"field '{name}' is empty")
+            err(fwhere, f"field '{name}' is empty")
             continue
         if checker:
-            checker(value, name, where)
+            checker(value, name, fwhere)
     for name in obj:
         if name not in schema:
-            err(where, f"unknown field '{name}'")
+            err(where.field(name), f"unknown field '{name}'")
     present = [name for name in obj if name in schema]
     if present != sorted(present, key=list(schema).index):
         err(where, "fields out of canonical order; run 'python3 scripts/canonicalize.py'")
@@ -190,14 +204,20 @@ def data_files():
     return matched, rejected
 
 
-def id_lines(text):
-    """Map each "id" value in text to its line number."""
-    lines = {}
+KEY_RE = re.compile(r'"([A-Za-z0-9_-]+)"\s*:(?:\s*"([^"]*)")?')
+
+
+def scan_lines(text):
+    id_line, entry_fields = {}, {}
+    fields = {}
     for lineno, line in enumerate(text.splitlines(), 1):
-        m = re.search(r'"id":\s*"([^"]*)"', line)
-        if m and m.group(1) not in lines:
-            lines[m.group(1)] = lineno
-    return lines
+        for m in KEY_RE.finditer(line):
+            key, value = m.group(1), m.group(2)
+            if key == "id" and value is not None and value not in id_line:
+                id_line[value] = lineno
+                fields = entry_fields.setdefault(value, {})
+            fields.setdefault(key, []).append(lineno)
+    return id_line, entry_fields
 
 
 def validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_names):
@@ -214,17 +234,20 @@ def validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_name
 
     icon = site.get("destination_icon")
     if isinstance(icon, str):
+        iwhere = where.field("destination_icon")
         if "/" in icon or "\\" in icon:
-            err(where, f"destination_icon must be a bare filename: '{icon}'")
+            err(iwhere, f"destination_icon must be a bare filename: '{icon}'")
         elif icon not in favicon_names:
-            err(where, f"destination_icon '{icon}' not found in favicons/{lang.lower()}/")
+            err(iwhere, f"destination_icon '{icon}' not found in favicons/{lang.lower()}/")
 
     origins = site.get("origins")
     if isinstance(origins, list):
         if not origins:
-            err(where, "origins must not be empty")
+            err(where.field("origins"), "origins must not be empty")
+        origin_lines = where.fields.get("origin", [])
         for i, origin in enumerate(origins):
-            owhere = where.at(f" origins[{i}]", title=f"{where.title}, origin {i}")
+            oline = origin_lines[i] if i < len(origin_lines) else None
+            owhere = where.at(f" origins[{i}]", line=oline, title=f"{where.title}, origin {i}")
             if not isinstance(origin, dict):
                 err(owhere, "must be an object")
                 continue
@@ -271,7 +294,7 @@ def main():
             err(floc, "top level must be a list")
             continue
 
-        entry_line = id_lines(text)
+        entry_line, entry_fields = scan_lines(text)
 
         favicon_lang_dir = os.path.join(FAVICON_DIR, lang.lower())
         if os.path.isdir(favicon_lang_dir):
@@ -289,14 +312,25 @@ def main():
                 continue
             if isinstance(site.get("id"), str):
                 site_id = site["id"]
-                where = where.at(f" '{site_id}'", line=entry_line.get(site_id), title=site_id)
+                where = where.at(
+                    f" '{site_id}'",
+                    line=entry_line.get(site_id),
+                    title=site_id,
+                    fields=entry_fields.get(site_id),
+                )
                 ids_in_file.append(site_id)
             validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_names)
             if isinstance(site.get("destination_icon"), str):
                 used_icons.add((lang.lower(), site["destination_icon"]))
 
-        if ids_in_file != sorted(ids_in_file):
-            err(floc, "entries must be sorted by id")
+        bad = next(
+            (i for i in range(1, len(ids_in_file)) if ids_in_file[i] < ids_in_file[i - 1]), None
+        )
+        if bad is not None:
+            err(
+                floc.at("", line=entry_line.get(ids_in_file[bad])),
+                f"entries must be sorted by id ('{ids_in_file[bad]}' is out of order)",
+            )
 
     # Warn on unused favicons; do not fail.
     if os.path.isdir(FAVICON_DIR):

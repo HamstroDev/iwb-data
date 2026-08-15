@@ -25,12 +25,30 @@ KNOWN_ORIGIN_FARMS = {"fandom.com", "neoseeker.com", "fextralife.com"}
 
 errors = []
 warnings = []
-# (filename, entry index)
-entry_lines = {}
 
 
-def err(msg):
-    errors.append(msg)
+class Loc:
+    """Where a problem is: the printed prefix plus the annotation target."""
+
+    def __init__(self, label, path=None, line=1, title="validation"):
+        self.label = label
+        self.path = path
+        self.line = line
+        self.title = title
+
+    def at(self, suffix, line=None, title=None):
+        return Loc(self.label + suffix, self.path, line or self.line, title or self.title)
+
+    def __str__(self):
+        return self.label
+
+
+def err(where, msg):
+    errors.append((where, msg))
+
+
+def warn(where, msg):
+    warnings.append((where, msg))
 
 
 def is_blank(value):
@@ -40,24 +58,25 @@ def is_blank(value):
 def check_known(value, known, const_name, field, where):
     if value not in known:
         err(
-            f"{where}: unknown {field} '{value}' "
+            where,
+            f"unknown {field} '{value}' "
             f"(known: {', '.join(sorted(known))}; "
-            f"extend {const_name} in scripts/validate.py if this is a new value)"
+            f"extend {const_name} in scripts/validate.py if this is a new value)",
         )
 
 
 def check_base_url(value, field, where):
     if "://" in value:
-        err(f"{where}: {field} must not include a scheme: '{value}'")
+        err(where, f"{field} must not include a scheme: '{value}'")
         return
     if value.endswith("/"):
-        err(f"{where}: {field} must not end with '/': '{value}'")
+        err(where, f"{field} must not end with '/': '{value}'")
         return
     host, slash, path = value.partition("/")
     if not HOST_RE.match(host):
-        err(f"{where}: {field} host '{host}' must be a lowercase hostname with optional port")
+        err(where, f"{field} host '{host}' must be a lowercase hostname with optional port")
     if slash and not re.match(r"^[^\s?#]+$", path):
-        err(f"{where}: {field} path '/{path}' must not contain whitespace, '?', or '#'")
+        err(where, f"{field} path '/{path}' must not contain whitespace, '?', or '#'")
 
 
 def check_origin_base_url(value, field, where):
@@ -65,28 +84,29 @@ def check_origin_base_url(value, field, where):
     host = value.partition("/")[0].partition(":")[0]
     if not any(host == farm or host.endswith("." + farm) for farm in KNOWN_ORIGIN_FARMS):
         err(
-            f"{where}: {field} '{value}' is not on a known wiki farm "
+            where,
+            f"{field} '{value}' is not on a known wiki farm "
             f"(known: {', '.join(sorted(KNOWN_ORIGIN_FARMS))}; "
-            f"extend KNOWN_ORIGIN_FARMS in scripts/validate.py if this is a new farm)"
+            f"extend KNOWN_ORIGIN_FARMS in scripts/validate.py if this is a new farm)",
         )
 
 
 def check_path(value, field, where):
     if not value.startswith("/"):
-        err(f"{where}: {field} must start with '/': '{value}'")
+        err(where, f"{field} must start with '/': '{value}'")
     elif any(c.isspace() for c in value):
-        err(f"{where}: {field} must not contain whitespace: '{value}'")
+        err(where, f"{field} must not contain whitespace: '{value}'")
     elif ".." in value:
-        err(f"{where}: {field} must not contain '..': '{value}'")
+        err(where, f"{field} must not contain '..': '{value}'")
 
 
 def check_main_page(value, field, where):
     if "://" in value:
-        err(f"{where}: {field} must be a page name, not a URL: '{value}'")
+        err(where, f"{field} must be a page name, not a URL: '{value}'")
     elif value != value.strip():
-        err(f"{where}: {field} has leading or trailing whitespace: '{value}'")
+        err(where, f"{field} has leading or trailing whitespace: '{value}'")
     elif value.startswith("/"):
-        err(f"{where}: {field} must not start with '/': '{value}'")
+        err(where, f"{field} must not start with '/': '{value}'")
 
 
 def check_platform(value, field, where):
@@ -100,7 +120,7 @@ def check_host(value, field, where):
 def check_tags(value, field, where):
     for tag in value:
         if not isinstance(tag, str):
-            err(f"{where}: tags must be strings")
+            err(where, "tags must be strings")
         else:
             check_known(tag, KNOWN_TAGS, "KNOWN_TAGS", field, where)
 
@@ -136,23 +156,23 @@ def check_fields(obj, schema, where):
     for name, (ftype, required, checker) in schema.items():
         if name not in obj:
             if required:
-                err(f"{where}: missing required field '{name}'")
+                err(where, f"missing required field '{name}'")
             continue
         value = obj[name]
         if not isinstance(value, ftype):
-            err(f"{where}: field '{name}' must be {ftype.__name__}")
+            err(where, f"field '{name}' must be {ftype.__name__}")
             continue
         if ftype is str and is_blank(value):
-            err(f"{where}: field '{name}' is empty")
+            err(where, f"field '{name}' is empty")
             continue
         if checker:
             checker(value, name, where)
     for name in obj:
         if name not in schema:
-            err(f"{where}: unknown field '{name}'")
+            err(where, f"unknown field '{name}'")
     present = [name for name in obj if name in schema]
     if present != sorted(present, key=list(schema).index):
-        err(f"{where}: fields out of canonical order; run 'python3 scripts/canonicalize.py'")
+        err(where, "fields out of canonical order; run 'python3 scripts/canonicalize.py'")
 
 
 def data_files():
@@ -170,39 +190,49 @@ def data_files():
     return matched, rejected
 
 
+def id_lines(text):
+    """Map each "id" value in text to its line number."""
+    lines = {}
+    for lineno, line in enumerate(text.splitlines(), 1):
+        m = re.search(r'"id":\s*"([^"]*)"', line)
+        if m and m.group(1) not in lines:
+            lines[m.group(1)] = lineno
+    return lines
+
+
 def validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_names):
     check_fields(site, SITE_FIELDS, where)
 
     site_id = site.get("id")
     if isinstance(site_id, str):
         if not id_re.match(site_id):
-            err(f"{where}: id '{site_id}' must match {id_re.pattern}")
+            err(where, f"id '{site_id}' must match {id_re.pattern}")
         if site_id in seen_ids:
-            err(f"{where}: duplicate id '{site_id}' (also in {seen_ids[site_id]})")
+            err(where, f"duplicate id '{site_id}' (also in {seen_ids[site_id]})")
         else:
             seen_ids[site_id] = where
 
     icon = site.get("destination_icon")
     if isinstance(icon, str):
         if "/" in icon or "\\" in icon:
-            err(f"{where}: destination_icon must be a bare filename: '{icon}'")
+            err(where, f"destination_icon must be a bare filename: '{icon}'")
         elif icon not in favicon_names:
-            err(f"{where}: destination_icon '{icon}' not found in favicons/{lang.lower()}/")
+            err(where, f"destination_icon '{icon}' not found in favicons/{lang.lower()}/")
 
     origins = site.get("origins")
     if isinstance(origins, list):
         if not origins:
-            err(f"{where}: origins must not be empty")
+            err(where, "origins must not be empty")
         for i, origin in enumerate(origins):
-            owhere = f"{where} origins[{i}]"
+            owhere = where.at(f" origins[{i}]", title=f"{where.title}, origin {i}")
             if not isinstance(origin, dict):
-                err(f"{owhere}: must be an object")
+                err(owhere, "must be an object")
                 continue
             check_fields(origin, ORIGIN_FIELDS, owhere)
             key = (origin.get("origin_base_url"), origin.get("origin_content_path"))
             if all(isinstance(k, str) for k in key):
                 if key in seen_origins:
-                    err(f"{owhere}: duplicate origin {key[0]}{key[1]} (also in {seen_origins[key]})")
+                    err(owhere, f"duplicate origin {key[0]}{key[1]} (also in {seen_origins[key]})")
                 else:
                     seen_origins[key] = owhere
 
@@ -210,7 +240,6 @@ def validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_name
 def main():
     errors.clear()
     warnings.clear()
-    entry_lines.clear()
 
     if not os.path.isdir(DATA_DIR):
         print("error: data/ directory not found")
@@ -218,9 +247,10 @@ def main():
 
     files, rejected = data_files()
     for filename in rejected:
-        err(f"data/{filename}: filename must match sites<LANG>.json (uppercase language code)")
+        floc = Loc(f"data/{filename}", path=f"data/{filename}", title=filename)
+        err(floc, "filename must match sites<LANG>.json (uppercase language code)")
     if not files:
-        err("data/ contains no sites<LANG>.json files")
+        err(None, "data/ contains no sites<LANG>.json files")
 
     seen_ids = {}
     seen_origins = {}
@@ -228,51 +258,45 @@ def main():
 
     for lang, path in files:
         filename = os.path.basename(path)
+        floc = Loc(f"data/{filename}", path=f"data/{filename}", title=filename)
         try:
             with open(path, encoding="utf-8") as f:
                 text = f.read()
             sites = json.loads(text)
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            err(f"data/{filename}: invalid JSON: {e}")
+            err(floc, f"invalid JSON: {e}")
             continue
 
         if not isinstance(sites, list):
-            err(f"data/{filename}: top level must be a list")
+            err(floc, "top level must be a list")
             continue
 
-        # Map each entry to line ID
-        id_line = {}
-        for lineno, text_line in enumerate(text.splitlines(), 1):
-            m = re.search(r'"id":\s*"([^"]*)"', text_line)
-            if m and m.group(1) not in id_line:
-                id_line[m.group(1)] = lineno
-        for idx, site in enumerate(sites):
-            if isinstance(site, dict) and site.get("id") in id_line:
-                entry_lines[(filename, idx)] = id_line[site["id"]]
+        entry_line = id_lines(text)
 
         favicon_lang_dir = os.path.join(FAVICON_DIR, lang.lower())
         if os.path.isdir(favicon_lang_dir):
             favicon_names = set(os.listdir(favicon_lang_dir))
         else:
             favicon_names = set()
-            err(f"favicons/{lang.lower()}/ directory not found for data/{filename}")
+            err(floc, f"favicons/{lang.lower()}/ directory not found")
 
         id_re = re.compile(rf"^{lang.lower()}-[a-z0-9_-]+$")
         ids_in_file = []
         for idx, site in enumerate(sites):
-            where = f"data/{filename}[{idx}]"
+            where = floc.at(f"[{idx}]", title=f"entry {idx}")
             if not isinstance(site, dict):
-                err(f"{where}: must be an object")
+                err(where, "must be an object")
                 continue
             if isinstance(site.get("id"), str):
-                where = f"{where} '{site['id']}'"
-                ids_in_file.append(site["id"])
+                site_id = site["id"]
+                where = where.at(f" '{site_id}'", line=entry_line.get(site_id), title=site_id)
+                ids_in_file.append(site_id)
             validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_names)
             if isinstance(site.get("destination_icon"), str):
                 used_icons.add((lang.lower(), site["destination_icon"]))
 
         if ids_in_file != sorted(ids_in_file):
-            err(f"data/{filename}: entries must be sorted by id")
+            err(floc, "entries must be sorted by id")
 
     # Warn on unused favicons; do not fail.
     if os.path.isdir(FAVICON_DIR):
@@ -284,42 +308,36 @@ def main():
                 if icon.startswith(".") or not os.path.isfile(os.path.join(lang_path, icon)):
                     continue
                 if (lang_dir, icon) not in used_icons:
-                    warnings.append(f"no site references favicons/{lang_dir}/{icon}")
+                    path = f"favicons/{lang_dir}/{icon}"
+                    warn(Loc(path, path=path, title="unused favicon"), "no site entry uses this favicon")
 
     report()
     return 1 if errors else 0
 
 
-# First data/ or favicons/ path in a message
-ANNOTATION_FILE_RE = re.compile(r"(?:data|favicons)/[^\s:'\[\]]*[^\s:'\[\]/]")
-ANNOTATION_ENTRY_RE = re.compile(r"data/([^\s:\[\]]+)\[(\d+)\]")
+def esc_property(value):
+    """Escape a workflow-command property value."""
+    value = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    return value.replace(":", "%3A").replace(",", "%2C")
 
 
-def annotation(level, msg):
-    """Format msg as a GitHub Actions workflow command."""
-    line = 1
-    m = ANNOTATION_ENTRY_RE.search(msg)
-    if m:
-        path = f"data/{m.group(1)}"
-        line = entry_lines.get((m.group(1), int(m.group(2))), 1)
-    else:
-        m = ANNOTATION_FILE_RE.search(msg)
-        path = m.group(0) if m else None
-    target = f" file={path},line={line}" if path else ""
+def annotation(level, where, msg):
+    """Format a problem as a GitHub Actions annotation."""
+    props = []
+    if where and where.path:
+        props = [f"file={esc_property(where.path)}", f"line={where.line}"]
+    props.append(f"title={esc_property(where.title if where else 'validation')}")
     escaped = msg.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-    return f"::{level}{target}::{escaped}"
+    return f"::{level} {','.join(props)}::{escaped}"
 
 
 def report():
     annotate = os.environ.get("GITHUB_ACTIONS") == "true"
-    for warning in warnings:
-        print(f"warning: {warning}")
-        if annotate:
-            print(annotation("warning", warning))
-    for error in errors:
-        print(f"error: {error}")
-        if annotate:
-            print(annotation("error", error))
+    for level, found in (("warning", warnings), ("error", errors)):
+        for where, msg in found:
+            print(f"{level}: {where}: {msg}" if where else f"{level}: {msg}")
+            if annotate:
+                print(annotation(level, where, msg))
     if errors:
         print(f"\nValidation failed with {len(errors)} error(s).")
     else:

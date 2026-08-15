@@ -25,6 +25,8 @@ KNOWN_ORIGIN_FARMS = {"fandom.com", "neoseeker.com", "fextralife.com"}
 
 errors = []
 warnings = []
+# (filename, entry index)
+entry_lines = {}
 
 
 def err(msg):
@@ -208,6 +210,7 @@ def validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_name
 def main():
     errors.clear()
     warnings.clear()
+    entry_lines.clear()
 
     if not os.path.isdir(DATA_DIR):
         print("error: data/ directory not found")
@@ -227,7 +230,8 @@ def main():
         filename = os.path.basename(path)
         try:
             with open(path, encoding="utf-8") as f:
-                sites = json.load(f)
+                text = f.read()
+            sites = json.loads(text)
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             err(f"data/{filename}: invalid JSON: {e}")
             continue
@@ -235,6 +239,16 @@ def main():
         if not isinstance(sites, list):
             err(f"data/{filename}: top level must be a list")
             continue
+
+        # Map each entry to line ID
+        id_line = {}
+        for lineno, text_line in enumerate(text.splitlines(), 1):
+            m = re.search(r'"id":\s*"([^"]*)"', text_line)
+            if m and m.group(1) not in id_line:
+                id_line[m.group(1)] = lineno
+        for idx, site in enumerate(sites):
+            if isinstance(site, dict) and site.get("id") in id_line:
+                entry_lines[(filename, idx)] = id_line[site["id"]]
 
         favicon_lang_dir = os.path.join(FAVICON_DIR, lang.lower())
         if os.path.isdir(favicon_lang_dir):
@@ -278,12 +292,20 @@ def main():
 
 # First data/ or favicons/ path in a message
 ANNOTATION_FILE_RE = re.compile(r"(?:data|favicons)/[^\s:'\[\]]*[^\s:'\[\]/]")
+ANNOTATION_ENTRY_RE = re.compile(r"data/([^\s:\[\]]+)\[(\d+)\]")
 
 
 def annotation(level, msg):
     """Format msg as a GitHub Actions workflow command."""
-    m = ANNOTATION_FILE_RE.search(msg)
-    target = f" file={m.group(0)}" if m else ""
+    line = 1
+    m = ANNOTATION_ENTRY_RE.search(msg)
+    if m:
+        path = f"data/{m.group(1)}"
+        line = entry_lines.get((m.group(1), int(m.group(2))), 1)
+    else:
+        m = ANNOTATION_FILE_RE.search(msg)
+        path = m.group(0) if m else None
+    target = f" file={path},line={line}" if path else ""
     escaped = msg.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
     return f"::{level}{target}::{escaped}"
 

@@ -32,10 +32,10 @@ def main():
 
     print(MARKER)
     if not errors:
-        print("**Validation passed.**")
+        print("Automated data review: **Validation passed.**")
         return
 
-    print("**Validation failed.**")
+    print("Automated data review: **Validation failed.**")
     print()
     blob = blob_url()
     for error in errors:
@@ -47,6 +47,7 @@ def main():
             print(f"- {place}: {message}")
         else:
             print(f"- {message}")
+    print()
     print(
         "If you can, please fix the errors and push a new commit. Otherwise, a maintainer will review and fix them. "
     )

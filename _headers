@@ -1,0 +1,7 @@
+/v1/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+
+/favicons/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=86400

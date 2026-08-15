@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
       - name: Check out PR content
@@ -26,7 +27,31 @@ jobs:
           mv pr/data data
           mv pr/favicons favicons
       - name: Validate data
-        run: python3 scripts/validate.py
+        run: VALIDATION_REPORT="$RUNNER_TEMP/validation.json" python3 scripts/validate.py
+      # Sticky comment on the PR to share validation details
+      - name: Comment results on PR
+        if: always() && github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          report="$RUNNER_TEMP/validation.json"
+          [ -f "$report" ] || exit 0
+          errors=$(jq '.errors | length' "$report")
+          marker='<!-- iwb-validation -->'
+          comment_id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n1)
+          if [ "$errors" -eq 0 ] && [ -z "$comment_id" ]; then
+            exit 0
+          fi
+          body=$(python3 scripts/pr_comment.py "$report")
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
 
   deploy:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

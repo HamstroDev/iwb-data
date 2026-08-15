@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check the files in data/. Print every problem and exit 1 if any."""
 
+import bisect
 import json
 import os
 import re
@@ -56,12 +57,13 @@ class Loc:
         return self.label
 
 
-def err(where, msg):
-    errors.append((where, msg))
+def err(where, msg, detail=None):
+    """Record an error."""
+    errors.append((where, msg, detail))
 
 
-def warn(where, msg):
-    warnings.append((where, msg))
+def warn(where, msg, detail=None):
+    warnings.append((where, msg, detail))
 
 
 def is_blank(value):
@@ -72,24 +74,24 @@ def check_known(value, known, const_name, field, where):
     if value not in known:
         err(
             where,
-            f"unknown {field} '{value}' "
-            f"(known: {', '.join(sorted(known))}; "
-            f"extend {const_name} in scripts/validate.py if this is a new value)",
+            f"unknown {field} "
+            f"(should be one of: {', '.join(sorted(known))}; ",
+            value,
         )
 
 
 def check_base_url(value, field, where):
     if "://" in value:
-        err(where, f"{field} must not include a scheme: '{value}'")
+        err(where, f"{field} must not include a scheme", value)
         return
     if value.endswith("/"):
-        err(where, f"{field} must not end with '/': '{value}'")
+        err(where, f"{field} must not end with '/'", value)
         return
     host, slash, path = value.partition("/")
     if not HOST_RE.match(host):
-        err(where, f"{field} host '{host}' must be a lowercase hostname with optional port")
+        err(where, f"{field} host must be a lowercase hostname with optional port", host)
     if slash and not re.match(r"^[^\s?#]+$", path):
-        err(where, f"{field} path '/{path}' must not contain whitespace, '?', or '#'")
+        err(where, f"{field} path must not contain whitespace, '?', or '#'", f"/{path}")
 
 
 def check_origin_base_url(value, field, where):
@@ -98,28 +100,29 @@ def check_origin_base_url(value, field, where):
     if not any(host == farm or host.endswith("." + farm) for farm in KNOWN_ORIGIN_FARMS):
         err(
             where,
-            f"{field} '{value}' is not on a known wiki farm "
+            f"{field} is not on a known wiki farm "
             f"(known: {', '.join(sorted(KNOWN_ORIGIN_FARMS))}; "
             f"extend KNOWN_ORIGIN_FARMS in scripts/validate.py if this is a new farm)",
+            value,
         )
 
 
 def check_path(value, field, where):
     if not value.startswith("/"):
-        err(where, f"{field} must start with '/': '{value}'")
+        err(where, f"{field} must start with '/'", value)
     elif any(c.isspace() for c in value):
-        err(where, f"{field} must not contain whitespace: '{value}'")
+        err(where, f"{field} must not contain whitespace", value)
     elif ".." in value:
-        err(where, f"{field} must not contain '..': '{value}'")
+        err(where, f"{field} must not contain '..'", value)
 
 
 def check_main_page(value, field, where):
     if "://" in value:
-        err(where, f"{field} must be a page name, not a URL: '{value}'")
+        err(where, f"{field} must be a page name, not a URL", value)
     elif value != value.strip():
-        err(where, f"{field} has leading or trailing whitespace: '{value}'")
+        err(where, f"{field} has leading or trailing whitespace", value)
     elif value.startswith("/"):
-        err(where, f"{field} must not start with '/': '{value}'")
+        err(where, f"{field} must not start with '/'", value)
 
 
 def check_platform(value, field, where):
@@ -183,10 +186,30 @@ def check_fields(obj, schema, where):
             checker(value, name, fwhere)
     for name in obj:
         if name not in schema:
-            err(where.field(name), f"unknown field '{name}'")
+            err(where.field(name), "unknown field", name)
     present = [name for name in obj if name in schema]
     if present != sorted(present, key=list(schema).index):
         err(where, "fields out of canonical order; run 'python3 scripts/canonicalize.py'")
+
+
+def misplaced(ids):
+    """The ids to move to make the list sorted: everything outside a longest sorted run."""
+    tails, tail_at, prev = [], [], [None] * len(ids)
+    for i, value in enumerate(ids):
+        k = bisect.bisect_right(tails, value)
+        if k == len(tails):
+            tails.append(value)
+            tail_at.append(i)
+        else:
+            tails[k] = value
+            tail_at[k] = i
+        prev[i] = tail_at[k - 1] if k else None
+    keep = set()
+    i = tail_at[-1] if tail_at else None
+    while i is not None:
+        keep.add(i)
+        i = prev[i]
+    return [value for i, value in enumerate(ids) if i not in keep]
 
 
 def data_files():
@@ -226,9 +249,9 @@ def validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_name
     site_id = site.get("id")
     if isinstance(site_id, str):
         if not id_re.match(site_id):
-            err(where, f"id '{site_id}' must match {id_re.pattern}")
+            err(where, f"id must match {id_re.pattern}", site_id)
         if site_id in seen_ids:
-            err(where, f"duplicate id '{site_id}' (also in {seen_ids[site_id]})")
+            err(where, "duplicate id", f"{site_id} also in {seen_ids[site_id]}")
         else:
             seen_ids[site_id] = where
 
@@ -236,9 +259,9 @@ def validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_name
     if isinstance(icon, str):
         iwhere = where.field("destination_icon")
         if "/" in icon or "\\" in icon:
-            err(iwhere, f"destination_icon must be a bare filename: '{icon}'")
+            err(iwhere, "destination_icon must be a bare filename", icon)
         elif icon not in favicon_names:
-            err(iwhere, f"destination_icon '{icon}' not found in favicons/{lang.lower()}/")
+            err(iwhere, f"destination_icon not found in favicons/{lang.lower()}/", icon)
 
     origins = site.get("origins")
     if isinstance(origins, list):
@@ -255,7 +278,7 @@ def validate_site(site, lang, id_re, where, seen_ids, seen_origins, favicon_name
             key = (origin.get("origin_base_url"), origin.get("origin_content_path"))
             if all(isinstance(k, str) for k in key):
                 if key in seen_origins:
-                    err(owhere, f"duplicate origin {key[0]}{key[1]} (also in {seen_origins[key]})")
+                    err(owhere, "duplicate origin", f"{key[0]}{key[1]} also in {seen_origins[key]}")
                 else:
                     seen_origins[key] = owhere
 
@@ -271,7 +294,7 @@ def main():
     files, rejected = data_files()
     for filename in rejected:
         floc = Loc(f"data/{filename}", path=f"data/{filename}", title=filename)
-        err(floc, "filename must match sites<LANG>.json (uppercase language code)")
+        err(floc, "filename must match sites<LANG>.json (uppercase language code)", filename)
     if not files:
         err(None, "data/ contains no sites<LANG>.json files")
 
@@ -287,7 +310,7 @@ def main():
                 text = f.read()
             sites = json.loads(text)
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            err(floc, f"invalid JSON: {e}")
+            err(floc, "invalid JSON", e)
             continue
 
         if not isinstance(sites, list):
@@ -323,13 +346,11 @@ def main():
             if isinstance(site.get("destination_icon"), str):
                 used_icons.add((lang.lower(), site["destination_icon"]))
 
-        bad = next(
-            (i for i in range(1, len(ids_in_file)) if ids_in_file[i] < ids_in_file[i - 1]), None
-        )
-        if bad is not None:
+        for site_id in misplaced(ids_in_file):
             err(
-                floc.at("", line=entry_line.get(ids_in_file[bad])),
-                f"entries must be sorted by id ('{ids_in_file[bad]}' is out of order)",
+                floc.at("", line=entry_line.get(site_id)),
+                "entries must be sorted by id",
+                f"{site_id} is out of order",
             )
 
     # Warn on unused favicons; do not fail.
@@ -349,33 +370,31 @@ def main():
     return 1 if errors else 0
 
 
-def esc_property(value):
-    """Escape a workflow-command property value."""
-    value = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-    return value.replace(":", "%3A").replace(",", "%2C")
-
-
-def annotation(level, where, msg):
-    """Format a problem as a GitHub Actions annotation."""
-    props = []
-    if where and where.path:
-        props = [f"file={esc_property(where.path)}", f"line={where.line}"]
-    props.append(f"title={esc_property(where.title if where else 'validation')}")
-    escaped = msg.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-    return f"::{level} {','.join(props)}::{escaped}"
-
-
 def report():
-    annotate = os.environ.get("GITHUB_ACTIONS") == "true"
     for level, found in (("warning", warnings), ("error", errors)):
-        for where, msg in found:
-            print(f"{level}: {where}: {msg}" if where else f"{level}: {msg}")
-            if annotate:
-                print(annotation(level, where, msg))
+        for where, msg, detail in found:
+            text = msg if detail is None else f"{msg}: {detail}"
+            print(f"{level}: {where}: {text}" if where else f"{level}: {text}")
     if errors:
         print(f"\nValidation failed with {len(errors)} error(s).")
     else:
         print("Validation passed.")
+
+    report_path = os.environ.get("VALIDATION_REPORT")
+    if report_path:
+        payload = {
+            "errors": [
+                {
+                    "path": where.path if where else None,
+                    "line": where.line if where else None,
+                    "message": msg,
+                }
+                for where, msg, _ in errors
+            ],
+            "warnings": len(warnings),
+        }
+        with open(report_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
 
 
 if __name__ == "__main__":

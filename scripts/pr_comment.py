@@ -32,10 +32,10 @@ def main():
 
     print(MARKER)
     if not errors:
-        print("Automated data review: **Validation passed.**")
+        print("Automated data check: ✅ **Validation passed.**")
         return
 
-    print("Automated data review: **Validation failed.**")
+    print("Automated data check: ❌ **Validation failed.**")
     print()
     blob = blob_url()
     for error in errors:

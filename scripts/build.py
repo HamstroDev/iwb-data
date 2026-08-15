@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Validate, then merge data/ into one deployable file.
+"""Validate, then build deployable data files from data/.
 
 Writes:
-  <outdir>/v1/data.json  - all sites, each with a "language" field
-  <outdir>/favicons/     - copy of the favicon tree
-  <outdir>/_headers      - Cloudflare Pages headers
+  <outdir>/v1/all-data.json     - all sites, each with a "language" field
+  <outdir>/v1/<lang>-data.json  - one file per language (e.g. en-data.json)
+  <outdir>/favicons/            - copy of the favicon tree
+  <outdir>/_headers             - Cloudflare Pages headers
 """
 
 import datetime
@@ -16,7 +17,7 @@ import sys
 import validate
 
 HEADERS = """\
-/v1/data.json
+/v1/*
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600
 
@@ -34,28 +35,38 @@ def main():
         print("Build aborted: fix validation errors first.")
         return 1
 
-    sites = []
-    for lang, path in validate.data_files()[0]:
-        with open(path, encoding="utf-8") as f:
-            for site in json.load(f):
-                site["language"] = lang
-                sites.append(site)
+    generated = (
+        datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+    )
+    commit = os.environ.get("GITHUB_SHA", "local")
 
-    data = {
-        "schemaVersion": 1,
-        "generated": datetime.datetime.now(datetime.timezone.utc)
-        .replace(microsecond=0)
-        .isoformat(),
-        "commit": os.environ.get("GITHUB_SHA", "local"),
-        "count": len(sites),
-        "sites": sites,
-    }
+    def envelope(sites):
+        return {
+            "schemaVersion": 1,
+            "generated": generated,
+            "commit": commit,
+            "count": len(sites),
+            "sites": sites,
+        }
+
+    def write_json(path, data):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
 
     v1_dir = os.path.join(outdir, "v1")
     os.makedirs(v1_dir, exist_ok=True)
-    out_path = os.path.join(v1_dir, "data.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+
+    all_sites = []
+    for lang, path in validate.data_files()[0]:
+        with open(path, encoding="utf-8") as f:
+            lang_sites = json.load(f)
+        for site in lang_sites:
+            site["language"] = lang
+        all_sites.extend(lang_sites)
+        write_json(os.path.join(v1_dir, f"{lang.lower()}-data.json"), envelope(lang_sites))
+
+    out_path = os.path.join(v1_dir, "all-data.json")
+    write_json(out_path, envelope(all_sites))
 
     favicon_out = os.path.join(outdir, "favicons")
     if os.path.isdir(favicon_out):
@@ -67,7 +78,7 @@ def main():
         f.write(HEADERS)
 
     size_kb = os.path.getsize(out_path) / 1024
-    print(f"Wrote {out_path}: {len(sites)} sites, {size_kb:.0f} KB")
+    print(f"Wrote {out_path}: {len(all_sites)} sites, {size_kb:.0f} KB")
     print(f"Copied {icon_count} favicons")
     return 0
 

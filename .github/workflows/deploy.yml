@@ -3,7 +3,7 @@ name: Validate and deploy
 on:
   push:
     branches: [main]
-  pull_request_target:
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -13,23 +13,11 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Check out PR content
-        if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: pr
-      - name: Use PR data with main's validator
-        if: github.event_name == 'pull_request_target'
-        run: |
-          rm -rf data favicons
-          mv pr/data data
-          mv pr/favicons favicons
       - name: Validate data
         run: python3 scripts/validate.py
 
   deploy:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     needs: validate
     runs-on: ubuntu-latest
     permissions:

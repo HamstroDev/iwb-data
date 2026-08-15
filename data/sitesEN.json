@@ -1,5 +1,26 @@
 [
   {
+    "id": "en-test",
+    "origins_label": "Test Fandom Wiki",
+    "origins": [
+      {
+        "origin": "Test Fandom Wiki",
+        "origin_base_url": "test.fandom.com",
+        "origin_content_path": "/wiki/",
+        "origin_main_page": "Test"
+      }
+    ],
+    "destination": "Test Wiki",
+    "destination_platform": "mediawiki",
+    "destination_icon": "test.png",
+    "destination_main_page": "Test",
+    "destination_search_path": "/index.php",
+    "destination_content_path": "/wiki/",
+    "tags": [
+      "officialtest"
+    ]
+  },
+  {
     "id": "en-1000xresist",
     "origins_label": "1000xRESIST Fandom Wiki",
     "origins": [

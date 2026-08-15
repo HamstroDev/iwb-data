@@ -148,6 +148,9 @@ def check_fields(obj, schema, where):
     for name in obj:
         if name not in schema:
             err(f"{where}: unknown field '{name}'")
+    present = [name for name in obj if name in schema]
+    if present != sorted(present, key=list(schema).index):
+        err(f"{where}: fields out of canonical order; run 'python3 scripts/canonicalize.py'")
 
 
 def data_files():
@@ -273,11 +276,28 @@ def main():
     return 1 if errors else 0
 
 
+# First data/ or favicons/ path in a message
+ANNOTATION_FILE_RE = re.compile(r"(?:data|favicons)/[^\s:'\[\]]*[^\s:'\[\]/]")
+
+
+def annotation(level, msg):
+    """Format msg as a GitHub Actions workflow command."""
+    m = ANNOTATION_FILE_RE.search(msg)
+    target = f" file={m.group(0)}" if m else ""
+    escaped = msg.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    return f"::{level}{target}::{escaped}"
+
+
 def report():
+    annotate = os.environ.get("GITHUB_ACTIONS") == "true"
     for warning in warnings:
         print(f"warning: {warning}")
+        if annotate:
+            print(annotation("warning", warning))
     for error in errors:
         print(f"error: {error}")
+        if annotate:
+            print(annotation("error", error))
     if errors:
         print(f"\nValidation failed with {len(errors)} error(s).")
     else:

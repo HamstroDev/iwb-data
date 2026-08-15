@@ -112,4 +112,4 @@ Every pull request is checked automatically. To pass:
 * Fields in each entry must appear in the order shown in the example above. Run `python3 scripts/canonicalize.py` to fix the order.
 * Each `destination_icon` must exist in the language's favicon folder.
 
-Run `python3 scripts/validate.py` before opening a pull request to catch problems early. Failures also show up as annotations on the pull request's changed files.
+Run `python3 scripts/validate.py` before opening a pull request to catch problems early. If validation fails, the pull request gets a comment pointing at the problem files and lines.

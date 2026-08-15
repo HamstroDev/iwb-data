@@ -132,12 +132,12 @@
     ],
     "destination": "Combine OverWiki",
     "destination_base_url": "combineoverwiki.net",
-    "destination_content_suffix": "/zh-hans",
     "destination_platform": "mediawiki",
     "destination_icon": "combine.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/index.php",
-    "destination_content_path": "/wiki/"
+    "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/zh-hans"
   },
   {
     "id": "zh-minecraft",

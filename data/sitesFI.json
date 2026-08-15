@@ -12,12 +12,12 @@
     ],
     "destination": "Portal Wiki",
     "destination_base_url": "theportalwiki.com",
-    "destination_content_suffix": "/fi",
     "destination_platform": "mediawiki",
     "destination_icon": "portalwiki.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/w/index.php",
-    "destination_content_path": "/wiki/"
+    "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/fi"
   },
   {
     "id": "fi-starwars",

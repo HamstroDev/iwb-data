@@ -141,9 +141,9 @@
     "destination_base_url": "danmachi.miraheze.org",
     "destination_platform": "mediawiki",
     "destination_icon": "danmachi.png",
-    "destination_content_path": "/wiki/",
-    "destination_search_path": "/w/index.php",
     "destination_main_page": "DanMachi_Wiki",
+    "destination_search_path": "/w/index.php",
+    "destination_content_path": "/wiki/",
     "destination_host": "Miraheze"
   },
   {
@@ -198,12 +198,12 @@
     ],
     "destination": "Combine OverWiki",
     "destination_base_url": "combineoverwiki.net",
-    "destination_content_suffix": "/es",
     "destination_platform": "mediawiki",
     "destination_icon": "combine.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/index.php",
-    "destination_content_path": "/wiki/"
+    "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/es"
   },
   {
     "id": "es-minecraft",
@@ -333,12 +333,12 @@
     ],
     "destination": "Team Fortress Wiki",
     "destination_base_url": "wiki.teamfortress.com",
-    "destination_content_suffix": "/es",
     "destination_platform": "mediawiki",
     "destination_icon": "teamfortress.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/w/index.php",
     "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/es",
     "tags": [
       "official"
     ]

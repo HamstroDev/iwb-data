@@ -370,12 +370,12 @@
     ],
     "destination": "Kerbal Space Program Wiki",
     "destination_base_url": "wiki.kerbalspaceprogram.com",
-    "destination_content_suffix": "/fr",
     "destination_platform": "mediawiki",
     "destination_icon": "kerbalspaceprogramwiki.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/index.php",
     "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/fr",
     "tags": [
       "official"
     ]
@@ -431,13 +431,13 @@
     ],
     "destination": "Lethal Company Wiki",
     "destination_base_url": "lethal.miraheze.org",
-    "destination_content_suffix": "/fr",
     "destination_platform": "mediawiki",
     "destination_icon": "lethalcompany.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/w/index.php",
     "destination_content_path": "/wiki/",
-    "destination_host": "Miraheze"
+    "destination_host": "Miraheze",
+    "destination_content_suffix": "/fr"
   },
   {
     "id": "fr-mario",
@@ -706,8 +706,8 @@
     "destination_base_url": "fr.zeldawiki.wiki",
     "destination_platform": "mediawiki",
     "destination_icon": "zeldawiki.png",
-    "destination_content_path": "/wiki/",
+    "destination_main_page": "Zelda_Wiki",
     "destination_search_path": "/w/index.php",
-    "destination_main_page": "Zelda_Wiki"
+    "destination_content_path": "/wiki/"
   }
 ]

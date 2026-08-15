@@ -58,12 +58,12 @@
     ],
     "destination": "Combine OverWiki",
     "destination_base_url": "combineoverwiki.net",
-    "destination_content_suffix": "/ru",
     "destination_platform": "mediawiki",
     "destination_icon": "combine.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/index.php",
-    "destination_content_path": "/wiki/"
+    "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/ru"
   },
   {
     "id": "ru-lethalcompany",
@@ -78,13 +78,13 @@
     ],
     "destination": "Lethal Company Wiki",
     "destination_base_url": "lethal.miraheze.org",
-    "destination_content_suffix": "/ru",
     "destination_platform": "mediawiki",
     "destination_icon": "lethalcompany.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/w/index.php",
     "destination_content_path": "/wiki/",
-    "destination_host": "Miraheze"
+    "destination_host": "Miraheze",
+    "destination_content_suffix": "/ru"
   },
   {
     "id": "ru-minecraft",
@@ -118,12 +118,12 @@
     ],
     "destination": "Portal Wiki",
     "destination_base_url": "theportalwiki.com",
-    "destination_content_suffix": "/ru",
     "destination_platform": "mediawiki",
     "destination_icon": "portalwiki.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/w/index.php",
-    "destination_content_path": "/wiki/"
+    "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/ru"
   },
   {
     "id": "ru-pou",
@@ -138,13 +138,13 @@
     ],
     "destination": "Poupedia",
     "destination_base_url": "poupedia.com",
-    "destination_content_suffix": "/ru",
     "destination_platform": "mediawiki",
     "destination_icon": "poupedia.png",
     "destination_main_page": "Poupedia",
     "destination_search_path": "/w/index.php",
     "destination_content_path": "/",
-    "destination_host": "Miraheze"
+    "destination_host": "Miraheze",
+    "destination_content_suffix": "/ru"
   },
   {
     "id": "ru-rainworld",
@@ -159,13 +159,13 @@
     ],
     "destination": "Rain World Wiki",
     "destination_base_url": "rainworld.miraheze.org",
-    "destination_content_suffix": "/ru",
     "destination_platform": "mediawiki",
     "destination_icon": "rainworld.png",
     "destination_main_page": "Rain_World_Wiki",
     "destination_search_path": "/w/index.php",
     "destination_content_path": "/wiki/",
     "destination_host": "Miraheze",
+    "destination_content_suffix": "/ru",
     "tags": [
       "official"
     ]

@@ -94,9 +94,9 @@
     "destination_base_url": "de.hytalewiki.org",
     "destination_platform": "mediawiki",
     "destination_icon": "hytalewiki.png",
-    "destination_content_path": "/w/",
+    "destination_main_page": "Hauptseite",
     "destination_search_path": "/",
-    "destination_main_page": "Hauptseite"
+    "destination_content_path": "/w/"
   },
   {
     "id": "de-lethalcompany",
@@ -111,13 +111,13 @@
     ],
     "destination": "Lethal Company Wiki",
     "destination_base_url": "lethal.miraheze.org",
-    "destination_content_suffix": "/de",
     "destination_platform": "mediawiki",
     "destination_icon": "lethalcompany.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/w/index.php",
     "destination_content_path": "/wiki/",
-    "destination_host": "Miraheze"
+    "destination_host": "Miraheze",
+    "destination_content_suffix": "/de"
   },
   {
     "id": "de-minecraft",

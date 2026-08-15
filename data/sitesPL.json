@@ -35,12 +35,12 @@
     ],
     "destination": "Combine OverWiki",
     "destination_base_url": "combineoverwiki.net",
-    "destination_content_suffix": "/pl",
     "destination_platform": "mediawiki",
     "destination_icon": "combine.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/index.php",
-    "destination_content_path": "/wiki/"
+    "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/pl"
   },
   {
     "id": "pl-minecraft",
@@ -93,12 +93,12 @@
     ],
     "destination": "Team Fortress Wiki",
     "destination_base_url": "wiki.teamfortress.com",
-    "destination_content_suffix": "/pl",
     "destination_platform": "mediawiki",
     "destination_icon": "teamfortress.png",
     "destination_main_page": "Main_Page",
     "destination_search_path": "/w/index.php",
     "destination_content_path": "/wiki/",
+    "destination_content_suffix": "/pl",
     "tags": [
       "official"
     ]

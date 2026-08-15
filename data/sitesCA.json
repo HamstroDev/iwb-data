@@ -14,8 +14,8 @@
     "destination_base_url": "ca.conanwiki.org",
     "destination_platform": "mediawiki",
     "destination_icon": "caconanwiki.png",
-    "destination_content_path": "/wiki/",
+    "destination_main_page": "Detectiu_Conan_Wiki",
     "destination_search_path": "/index.php",
-    "destination_main_page": "Detectiu_Conan_Wiki"
+    "destination_content_path": "/wiki/"
   }
 ]

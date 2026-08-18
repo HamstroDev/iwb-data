@@ -1,0 +1,63 @@
+name: Validate PRs
+
+on:
+  pull_request_target:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # PR content is data only: no step may run code from this checkout.
+      - name: Check out PR content
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          persist-credentials: false
+          allow-unsafe-pr-checkout: true
+      - name: Use PR data with main's validator
+        run: |
+          rm -rf data favicons
+          mv pr/data data
+          mv pr/favicons favicons
+      - name: Validate data
+        run: VALIDATION_REPORT="$RUNNER_TEMP/validation.json" python3 scripts/validate.py
+      # Post as the indie-wiki-buddy app; fall back to github-actions if that fails.
+      - name: Mint app token
+        id: app-token
+        if: always()
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      # Sticky comment on the PR to share validation details
+      - name: Comment results on PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          report="$RUNNER_TEMP/validation.json"
+          [ -f "$report" ] || exit 0
+          errors=$(jq '.errors | length' "$report")
+          marker='<!-- iwb-validation -->'
+          comment_id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -n1)
+          if [ "$errors" -eq 0 ] && [ -z "$comment_id" ]; then
+            exit 0
+          fi
+          body=$(python3 scripts/pr_comment.py "$report")
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
+          fi

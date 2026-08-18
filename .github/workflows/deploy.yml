@@ -14,12 +14,17 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # PR content is data only: no step may run code from this checkout.
       - name: Check out PR content
         if: github.event_name == 'pull_request_target'
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: pr
+          persist-credentials: false
+          allow-unsafe-pr-checkout: true
       - name: Use PR data with main's validator
         if: github.event_name == 'pull_request_target'
         run: |
